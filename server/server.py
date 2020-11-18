@@ -25,30 +25,45 @@ async def client_message_handler(text, sender):
     '''
 
     # Verificar se tem um destino especificado
-    if text[0:1] == ">>":
-        target = text[2:text.find(":")]
+    if text[:2] == ">>":
+
+        target_end = text.find(">>", 2)
+        if target_end  != -1:
+            target = text[2:text.find(">>", 2)]
+            message = text[text.find(">>", 2):]
+
+        else:
+            await sender.send("Para mensagem privada use a notação '>>[nome do usuário]>>' ")
+            target = None
+
         if target not in client_dic.values():
-            await sender.send("Usuário não disponível")
-            target = "all"
+            await sender.send("Esse usuário não está na  sala :(")
+            target = None
 
     else: target = "all"
 
-    # Mensagem para todos os usuários menos o próprio sender
+    # Mensagem para todos os usuários
     if target ==  'all':
-        message = str(sender) + " : " + text
+
+        message = str(client_dic[sender]) + " : " + text
+        #await sender.send(message)
         for key in client_dic.keys():
+            #if client_dic[key] != sender:
             client = key
             await client.send(message)
 
     # Mensagem para um target em específico
     elif target in client_dic.values():
-        message = str(sender) + " " + text
+
+        message = str(client_dic[sender]) + " >> " + str(target) + " : " + text
+        await sender.send(message)
         for key in client_dic.keys():
              if client_dic[key] == target:
                 client = key
                 await client.send(message)
 
-async def server_message_handler(text, exception_websocket = None):
+# Mensagens do servidor, com escolha de excessões
+async def server_message_handler(text, exception_websocket = []):
     '''
     '''
     message = text
@@ -70,7 +85,7 @@ async def unregister(websocket):
     '''
     message = str(client_dic[websocket]) + " saiu da sala :("
     client_dic.pop(websocket)
-    await server_message_handler(message, [websocket])
+    await server_message_handler(message)
 
 
 #=== CLIENT HANDLER ===
@@ -88,14 +103,14 @@ async def client_handler(websocket, path):
         name = await websocket.recv()
 
     await register(websocket, name)
-    await websocket.send("Prontinho " + str(name) + "!!! Aproveite essa experiência !")
-    await websocket.send("Para enviar mensagens no privado inicie a mensagem com '>> [nome do usuário] :' ")
+    await websocket.send("Prontinho " + str(name) + " !!! Envie mensagens para conversar na sala !")
+    await websocket.send("Para enviar mensagens no privado inicie a mensagem com '>>[nome do usuário]>>' ")
 
     # Loop do Handler
     while True:
         try:
             message = await websocket.recv()
-            await client_message_handler(message, name)
+            await client_message_handler(message, websocket)
 
         except:
             await unregister(websocket)
